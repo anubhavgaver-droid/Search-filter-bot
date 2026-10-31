@@ -1,0 +1,347 @@
+"""All user-facing message designs live here - edit freely to restyle the bot."""
+import html
+
+LINE = "━━━━━━━━━━━━━━━━━━"
+BULLET = "◉"
+
+
+def _box(head: str, *lines: str) -> str:
+    return "\n".join([LINE, head, LINE, *lines])
+
+
+def mention(user) -> str:
+    name = html.escape((user.first_name or "User")[:30])
+    return f'<a href="tg://user?id={user.id}">{name}</a>'
+
+
+def mention_id(uid: int, name: str) -> str:
+    return f'<a href="tg://user?id={uid}">{html.escape((name or "User")[:30])}</a>'
+
+
+def welcome() -> str:
+    return _box(
+        "👋 <b>WELCOME TO STORY SEARCH</b>",
+        f"{BULLET} Send a story name to search",
+        f"{BULLET} Spelling mistakes are fine",
+        f"{BULLET} Try hashtags like <code>#romance</code>",
+        f"{BULLET} Works in groups too",
+        f"{BULLET} /filters - see all stories (tap a name to copy)",
+        f"{BULLET} /request <i>name</i> - request a new story",
+        f"{BULLET} /app - open the Mini App",
+        LINE,
+    )
+
+
+def too_short() -> str:
+    return _box("✍️ <b>TOO SHORT</b>", "Please type at least 2 characters.", LINE)
+
+
+_AI_FRAMES = [
+    ("🔍", "▰▱▱▱▱▱▱▱", "Scanning the story library…"),
+    ("🔎", "▰▰▰▱▱▱▱▱", "Understanding your spelling…"),
+    ("🔍", "▰▰▰▰▰▱▱▱", "Matching similar names…"),
+    ("✨", "▰▰▰▰▰▰▰▰", "Picking the best results…"),
+]
+AI_FRAME_COUNT = len(_AI_FRAMES)
+
+
+def ai_frame(i: int) -> str:
+    icon, bar, status = _AI_FRAMES[min(i, AI_FRAME_COUNT - 1)]
+    return _box(
+        f"🤖 <b>AI SEARCH</b> {icon}",
+        f"<code>{bar}</code>",
+        f"⚡ <i>{status}</i>",
+        LINE,
+    )
+
+
+def results(mode: str, hits: list, user_html: str, query: str, elapsed: float, page_info=None) -> str:
+    head = {
+        "exact": "🔎 <b>SEARCH RESULT</b>",
+        "suggest": "🤔 <b>DID YOU MEAN?</b>",
+        "tag": "🏷 <b>HASHTAG RESULTS</b>",
+    }[mode]
+    if mode == "suggest":
+        names = [f"{BULLET} <b>Name:</b> {html.escape(p['title'])}" for p in hits]
+        foot = "🤖 <i>AI picked the best matches - tap one to get it</i>"
+    else:
+        names = [f"{BULLET} <b>Name:</b> {html.escape(p['title'])}" for p in hits]
+        foot = "👇 <i>Tap a button to get your post</i>"
+    info = [f"📄 <b>Page:</b> {page_info[0]}/{page_info[1]}  •  <b>Total:</b> {page_info[2]}"] if page_info else []
+    return _box(
+        head,
+        f"👤 <b>Searched by:</b> {user_html}",
+        f"🔍 <b>Query:</b> <i>{html.escape(query[:60])}</i>",
+        f"⚡ <b>Found in:</b> {elapsed:.2f} sec",
+        *info,
+        LINE,
+        *names,
+        LINE,
+        foot,
+    )
+
+
+def not_found(user_html: str, query: str, elapsed: float) -> str:
+    return _box(
+        "❌ <b>NOTHING FOUND</b>",
+        f"👤 <b>Searched by:</b> {user_html}",
+        f"🔍 <b>Query:</b> <i>{html.escape(query[:60])}</i>",
+        f"⚡ <b>Checked in:</b> {elapsed:.2f} sec",
+        LINE,
+        "Check the spelling or try another name.",
+    )
+
+
+def link_ready(title: str) -> str:
+    return _box(
+        "✅ <b>YOUR POST IS READY</b>",
+        f"{BULLET} <b>Name:</b> {html.escape(title)}",
+        LINE,
+        "👇 <i>Tap below to open it</i>",
+    )
+
+
+def join_required(title: str) -> str:
+    return _box(
+        "🔒 <b>JOIN REQUIRED</b>",
+        f"{BULLET} <b>Name:</b> {html.escape(title)}",
+        LINE,
+        "First join this channel, because the post is uploaded there.",
+        "Then tap <b>✅ I've joined</b> to get your link.",
+    )
+
+
+def removed() -> str:
+    return _box("⚠️ <b>POST REMOVED</b>", "This post is no longer available.")
+
+
+def cant_check() -> str:
+    return _box("⚠️ <b>CAN'T CHECK CHANNEL</b>", "Please tell the admin (the bot must be admin there).")
+
+
+def cant_invite() -> str:
+    return _box("⚠️ <b>JOIN LINK FAILED</b>", "Couldn't create a join link. Please contact the admin.")
+
+
+# ---------- story library (/filters) ----------
+def library(chunk: list, page: int, pages: int, total_all: int, matched: int, arg: str) -> str:
+    info = [f"📦 <b>Total stories:</b> {total_all}"]
+    if arg:
+        info.append(f"🔎 <b>Filter:</b> <i>{html.escape(arg[:40])}</i>  •  <b>Matched:</b> {matched}")
+    info.append(f"📄 <b>Page:</b> {page + 1}/{pages}")
+    names = [f"{BULLET} <code>{html.escape(t)}</code>" for t in chunk]
+    return _box(
+        "📚 <b>STORY LIBRARY</b>",
+        *info,
+        LINE,
+        *names,
+        LINE,
+        "👆 <i>Tap a name to copy it, then send it to me to search</i>",
+    )
+
+
+def library_empty(arg: str) -> str:
+    return _box("📚 <b>STORY LIBRARY</b>", f"Nothing matched <i>{html.escape(arg[:40])}</i>." if arg else "No stories yet.")
+
+
+# ---------- story requests ----------
+def request_usage() -> str:
+    return _box("📨 <b>REQUEST A STORY</b>", "Send the story name like this:", "<code>/request Story Name</code>")
+
+
+def request_exists(user_html: str, name: str, hits: list) -> str:
+    names = [f"{BULLET} <b>Name:</b> {html.escape(p['title'])}" for p in hits]
+    return _box(
+        "✅ <b>ALREADY AVAILABLE</b>",
+        f"👤 <b>Requested by:</b> {user_html}",
+        f"🔍 <b>Request:</b> <i>{html.escape(name[:60])}</i>",
+        LINE,
+        *names,
+        LINE,
+        "👇 <i>No need to request - tap to get it</i>",
+    )
+
+
+def request_sent(name: str) -> str:
+    return _box(
+        "📨 <b>REQUEST SENT</b>",
+        f"{BULLET} <b>Story:</b> {html.escape(name[:80])}",
+        LINE,
+        "✅ The admin has been notified.",
+        "You'll get a message here when it's added.",
+    )
+
+
+def request_limit(n: int) -> str:
+    return _box("⏳ <b>REQUEST LIMIT</b>", f"You can send {n} requests per day. Please try again later.")
+
+
+def request_admin(name: str, user_html: str, uid: int, where: str) -> str:
+    return _box(
+        "📨 <b>NEW STORY REQUEST</b>",
+        f"{BULLET} <b>Story:</b> {html.escape(name[:100])}",
+        f"👤 <b>From:</b> {user_html}  <code>{uid}</code>",
+        f"📍 <b>Where:</b> {html.escape(where[:50])}",
+    )
+
+
+def request_done(name: str, ok: bool, user_html=None) -> str:
+    who = [f"👤 <b>Requested by:</b> {user_html}"] if user_html else []
+    if ok:
+        return _box(
+            "✅ <b>STORY ADDED</b>",
+            *who,
+            f"{BULLET} <b>Story:</b> {html.escape(name[:80])}",
+            LINE,
+            "Search it now - it's available! 🎉",
+        )
+    return _box(
+        "❌ <b>REQUEST DECLINED</b>",
+        *who,
+        f"{BULLET} <b>Story:</b> {html.escape(name[:80])}",
+        LINE,
+        "Sorry, this story couldn't be added right now.",
+    )
+
+
+def request_list(rows: list, total: int) -> str:
+    lines = [f"{BULLET} <code>{html.escape(r['query'][:60])}</code> - {html.escape(r.get('user_name', '?')[:20])}" for r in rows]
+    return _box("📨 <b>PENDING REQUESTS</b>", f"📦 <b>Total pending:</b> {total}", LINE, *(lines or ["Nothing pending 🎉"]))
+
+
+def not_your_search() -> str:
+    return _box(
+        "🙅 <b>NOT YOUR SEARCH</b>",
+        "This result was searched by someone else.",
+        "Please search your own story 🔍",
+        LINE,
+        "👇 <i>Go to the group and search yours</i>",
+    )
+
+
+def genre_menu(total: int, page: int, pages: int) -> str:
+    return _box(
+        "🎭 <b>FIND BY GENRE</b>",
+        f"📦 <b>Genres available:</b> {total}",
+        f"📄 <b>Page:</b> {page + 1}/{pages}",
+        LINE,
+        "👇 <i>Tap a genre to see its stories</i>",
+    )
+
+
+def miniapp_card() -> str:
+    return _box(
+        "🚀 <b>STORY SEARCH APP</b>",
+        f"{BULLET} Search every story in a clean app",
+        f"{BULLET} Tap a genre or type a name",
+        f"{BULLET} Tap <b>Get link</b> - it opens here in the bot",
+        LINE,
+    )
+
+
+# ---------- anti-abuse / force subscribe ----------
+def slow_down() -> str:
+    return _box("⏳ <b>SLOW DOWN</b>", "Please wait a few seconds between searches.")
+
+
+def force_sub() -> str:
+    return _box(
+        "🔔 <b>JOIN OUR CHANNEL</b>",
+        "To get story links you need to join our channel first.",
+        LINE,
+        "1️⃣ Tap <b>Join channel</b>",
+        "2️⃣ Then tap <b>✅ I've joined</b>",
+    )
+
+
+# ---------- reports ----------
+def report_admin(title: str, link: str, user_html: str) -> str:
+    return _box(
+        "⚠️ <b>BROKEN LINK REPORT</b>",
+        f"{BULLET} <b>Story:</b> {html.escape(title[:100])}",
+        f"👤 <b>Reported by:</b> {user_html}",
+        f"🔗 {html.escape(link)}",
+    )
+
+
+# ---------- admin: stats / missing / groups / auto-fulfilled ----------
+def stats_box(d: dict) -> str:
+    def rate(t, f):
+        return f"{f}/{t} ({round(100 * f / t)}%)" if t else "0"
+
+    top = [f"{BULLET} <code>{html.escape(q)}</code> - {n}" for q, n in d["top_today"]] or ["-"]
+    best = [f"{BULLET} {html.escape(t[:40])} - {n}" for t, n in d["top_stories"]] or ["-"]
+    return _box(
+        "📊 <b>BOT STATS</b>",
+        f"📚 <b>Stories:</b> {d['posts']}   📡 <b>Channels:</b> {d['channels']}",
+        f"👥 <b>Users:</b> {d['users']}  (+{d['new24']} today, +{d['new7']} this week)",
+        f"🔍 <b>Searches today:</b> {d['s1'][0]}  •  found {rate(*d['s1'])}",
+        f"🔍 <b>Searches 7 days:</b> {d['s7'][0]}  •  found {rate(*d['s7'])}",
+        LINE,
+        "🔥 <b>Top searches today</b>",
+        *top,
+        LINE,
+        "⭐ <b>Most opened stories (7 days)</b>",
+        *best,
+        LINE,
+        f"📨 <b>Pending requests:</b> {d['pending']}   🕳 <b>Missing:</b> {d['misses']}",
+        f"🚫 <b>Banned:</b> {d['bans']}   🏘 <b>Allowed groups:</b> {d['groups'] or 'all'}",
+    )
+
+
+def missing_list(rows: list, total: int) -> str:
+    lines = [f"{BULLET} <code>{html.escape(r.get('q', r['_id'])[:50])}</code> - searched {r['count']}x" for r in rows]
+    return _box(
+        "🕳 <b>NOT FOUND SEARCHES</b>",
+        f"📦 <b>Total unique:</b> {total}",
+        LINE,
+        *(lines or ["Nothing missing 🎉"]),
+        LINE,
+        "💡 <i>Add these stories first. /missing clear resets the list.</i>",
+    )
+
+
+def groups_list(rows: list) -> str:
+    lines = [f"{BULLET} {html.escape(g.get('title', '?')[:40])} <code>{g['_id']}</code>" for g in rows]
+    return _box(
+        "🏘 <b>ALLOWED GROUPS</b>",
+        *(lines or ["None set - the bot works in every group."]),
+        LINE,
+        "➕ <code>/allowgroup</code> inside a group, or <code>/allowgroup -100id</code> / <code>@username</code> here.",
+        "Tap a button below to remove a group.",
+    )
+
+
+def auto_fulfilled(title: str, rows: list) -> str:
+    lines = [f"{BULLET} <code>{html.escape(q[:40])}</code> - {html.escape(name[:20])}: {info}" for q, name, info in rows]
+    return _box("🤖 <b>REQUESTS AUTO-FULFILLED</b>", f"{BULLET} <b>New story:</b> {html.escape(title[:80])}", LINE, *lines)
+
+
+def backup_caption(counts: dict) -> str:
+    lines = [f"{BULLET} {k}: {v}" for k, v in counts.items()]
+    return _box("💾 <b>DATABASE BACKUP</b>", *lines, LINE, "Reply to this file with /restore to load it back.")
+
+
+def set_link_prompt(title: str, pid: str, ref: str, user_html: str) -> str:
+    return _box(
+        "🔗 <b>SET NEW LINK</b>",
+        f"👤 {user_html}",
+        f"{BULLET} <b>Story:</b> {html.escape(title[:100])}",
+        f"ID: <code>{html.escape(pid)}</code>",
+        f"Ref: <code>{html.escape(ref)}</code>",
+        LINE,
+        "↩️ <b>Reply to this message</b> with the new link:",
+        f"{BULLET} public: <code>https://t.me/channel/45</code>",
+        f"{BULLET} private: the link, and the channel ID (<code>-100…</code>) on the next line",
+    )
+
+
+def link_changed(title: str, link: str, private: bool) -> str:
+    return _box(
+        "✅ <b>LINK UPDATED</b>",
+        f"{BULLET} <b>Story:</b> {html.escape(title[:100])}",
+        f"{BULLET} <b>Type:</b> {'🔒 Private' if private else '🌐 Public'}",
+        f"🔗 {html.escape(link)}",
+        LINE,
+        "Users get the new link from now on.",
+    )
