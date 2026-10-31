@@ -7,6 +7,7 @@ import guards
 import texts
 from config import Config
 from delivery import miniapp_button, reply_temp
+from richmsg import Btn
 
 
 @Client.on_message(filters.command(["app", "miniapp"]))
@@ -17,4 +18,7 @@ async def open_app(client, message):
     btn = miniapp_button(message.chat.type == ChatType.PRIVATE)
     if not btn:
         return await reply_temp(message, "⚠️ Mini App isn't configured yet (BASE_URL missing).")
-    await reply_temp(message, texts.miniapp_card(), InlineKeyboardMarkup([[btn]]))
+    if message.chat.type == ChatType.PRIVATE:  # a real Mini App button only works as a normal inline button
+        return await reply_temp(message, texts.miniapp_card(), InlineKeyboardMarkup([[btn]]))
+    link = Config.MINIAPP_LINK or f"https://t.me/{Config.BOT_USERNAME}?start=app"
+    await reply_temp(message, texts.miniapp_card(), [[Btn("🚀 Open Mini App", url=link, style="success")]])

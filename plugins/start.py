@@ -5,6 +5,7 @@ from config import Config
 import texts
 from delivery import deliver, miniapp_button, send_temp
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from richmsg import Btn
 from utils import parse_start_payload
 
 ADMIN_HELP = (
@@ -38,7 +39,7 @@ async def start(client, message):
             await db.schedule_delete(message.chat.id, message.id, Config.AUTO_DELETE)
             if owner and owner != message.from_user.id:
                 # someone else's search result -> send them back to search their own
-                kb = InlineKeyboardMarkup([[InlineKeyboardButton("🔍 Search your own story", url=Config.GROUP_LINK)]])
+                kb = [[Btn("🔍 Search your own story", url=Config.GROUP_LINK, style="primary")]]
                 return await send_temp(client, message.from_user.id, texts.not_your_search(), kb)
             return await deliver(client, message.from_user.id, pid)
 

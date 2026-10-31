@@ -5,6 +5,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 import database as db
 import search_engine as engine
+from compat import NOPREVIEW
 from config import Config
 from notifier import fulfil_requests
 from utils import diagnose, get_text, manual_id, parse_link, parse_post, post_link
@@ -92,5 +93,5 @@ async def parse_cmd(client, message):
         f"Tags: {html.escape(' '.join(data['hashtags']) or '-')}\n"
         f"Type: {'🔒 Private' if data['is_private'] else '🌐 Public'}\n"
         f"Link: {html.escape(post_link(data))}",
-        disable_web_page_preview=True,
+        **NOPREVIEW,
     )

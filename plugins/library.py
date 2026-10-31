@@ -3,14 +3,15 @@ from collections import Counter
 
 from pyrogram import Client, filters
 from pyrogram.errors import MessageNotModified
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 import database as db
 import guards
 import sessions
 import texts
 from config import Config
+import richmsg
 from delivery import delete_note, nav_row, reply_temp
+from richmsg import Btn
 
 PER_PAGE = 15          # story names per page
 GENRES_PER_PAGE = 12   # genre buttons per page (2 per row)
@@ -40,13 +41,13 @@ def list_view(sid: str, s: dict, page: int):
     rows = []
     if pages > 1:
         rows.append(nav_row("lp", sid, page, pages))
-    genre_btn = InlineKeyboardButton("🎭 Find by Genre" if not s["arg"] else "🎭 Genres", callback_data=f"lg:{sid}:0")
+    genre_btn = Btn("🎭 Find by Genre" if not s["arg"] else "🎭 Genres", cb=f"lg:{sid}:0", style="primary")
     if s["arg"]:
-        bottom = ([genre_btn] if s["genres"] else []) + [InlineKeyboardButton("📚 Go to all stories", callback_data=f"la:{sid}")]
+        bottom = ([genre_btn] if s["genres"] else []) + [Btn("📚 Go to all stories", cb=f"la:{sid}", style="success")]
         rows.append(bottom)
     elif s["genres"]:
         rows.append([genre_btn])
-    return text, (InlineKeyboardMarkup(rows) if rows else None)
+    return text, (rows or None)
 
 
 def genre_view(sid: str, s: dict, page: int):
@@ -58,7 +59,7 @@ def genre_view(sid: str, s: dict, page: int):
 
     rows, row = [], []
     for k, (tag, cnt) in enumerate(g[start : start + GENRES_PER_PAGE], start=start):
-        row.append(InlineKeyboardButton(f"{_nice(tag)} ({cnt})", callback_data=f"ln:{sid}:{k}"))
+        row.append(Btn(f"{_nice(tag)} ({cnt})", cb=f"ln:{sid}:{k}", style="primary"))
         if len(row) == 2:
             rows.append(row)
             row = []
@@ -66,15 +67,12 @@ def genre_view(sid: str, s: dict, page: int):
         rows.append(row)
     if pages > 1:
         rows.append(nav_row("lg", sid, page, pages))
-    rows.append([InlineKeyboardButton("📚 Go to all stories", callback_data=f"la:{sid}")])
-    return texts.genre_menu(len(g), page, pages), InlineKeyboardMarkup(rows)
+    rows.append([Btn("📚 Go to all stories", cb=f"la:{sid}", style="success")])
+    return texts.genre_menu(len(g), page, pages), rows
 
 
 async def _edit(cq, text, kb):
-    try:
-        await cq.message.edit_text(text + delete_note(), reply_markup=kb, disable_web_page_preview=True)
-    except MessageNotModified:
-        pass
+    await richmsg.edit(cq.message, text + delete_note(), kb or [])
     await cq.answer()
 
 

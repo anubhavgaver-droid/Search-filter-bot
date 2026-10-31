@@ -5,6 +5,7 @@ from pyrogram.types import ForceReply, InlineKeyboardButton, InlineKeyboardMarku
 
 import database as db
 import texts
+from compat import NOPREVIEW
 from config import Config
 from delivery import deliver
 from notifier import admin_targets
@@ -28,7 +29,7 @@ async def report(client, cq):
     text = texts.report_admin(p["title"], post_link(p), texts.mention(cq.from_user))
     for t in admin_targets():
         try:
-            await client.send_message(t, text, reply_markup=kb, disable_web_page_preview=True)
+            await client.send_message(t, text, reply_markup=kb, **NOPREVIEW)
         except Exception:
             pass
     await cq.answer("Thanks! The admin has been notified. 🙏", show_alert=True)
@@ -36,7 +37,7 @@ async def report(client, cq):
 
 async def _finish(cq, label: str):
     try:
-        await cq.message.edit_text(f"{cq.message.text.html}\n\n{label} by {texts.mention(cq.from_user)}", reply_markup=None, disable_web_page_preview=True)
+        await cq.message.edit_text(f"{cq.message.text.html}\n\n{label} by {texts.mention(cq.from_user)}", reply_markup=None, **NOPREVIEW)
     except Exception:
         pass
 
@@ -86,7 +87,7 @@ async def report_new_link(client, cq):
         cq.message.chat.id,
         texts.set_link_prompt(p["title"], pid, f"{cq.message.chat.id}:{cq.message.id}", texts.mention(cq.from_user)),
         reply_markup=ForceReply(selective=True, placeholder="https://t.me/channel/45"),
-        disable_web_page_preview=True,
+        **NOPREVIEW,
     )
 
 
@@ -122,7 +123,7 @@ async def apply_new_link(client, message):
     await message.reply_text(
         texts.link_changed(p["title"], new_link, fields["is_private"]),
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📂 Test the new link", url=new_link)]]),
-        disable_web_page_preview=True,
+        **NOPREVIEW,
     )
 
     ref = re.search(r"Ref:\s*(-?\d+):(\d+)", rep.text)  # mark the original report as handled
@@ -133,7 +134,7 @@ async def apply_new_link(client, message):
             await client.edit_message_text(
                 chat_id, mid,
                 f"{orig.text.html}\n\n🔗 <b>Link changed</b> by {texts.mention(message.from_user)}",
-                reply_markup=None, disable_web_page_preview=True,
+                reply_markup=None, **NOPREVIEW,
             )
         except Exception:
             pass

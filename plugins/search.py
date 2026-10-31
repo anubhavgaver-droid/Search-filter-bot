@@ -11,7 +11,8 @@ import search_engine as engine
 import sessions
 import texts
 from config import Config
-from delivery import deliver, delete_note, reply_temp, results_keyboard
+import richmsg
+from delivery import deliver, delete_note, reply_temp, result_rows
 from tracking import track_search
 
 # normal chat words the bot should never answer in a group
@@ -73,7 +74,7 @@ async def respond(message, q: str, group: bool) -> bool:
     await reply_temp(
         message,
         texts.results(mode, view, user, q, elapsed, page_info),
-        results_keyboard(view, group, sid, 0, pages, owner_id=message.from_user.id),
+        result_rows(view, group, sid, 0, pages, owner_id=message.from_user.id),
     )
     return True
 
@@ -126,14 +127,7 @@ async def paginate(client, cq):
     page = max(0, min(page, pages - 1))
     view = s["hits"][page * ps : (page + 1) * ps]
     text = texts.results(s["mode"], view, s["user_html"], s["query"], s["elapsed"], (page + 1, pages, len(s["hits"])))
-    try:
-        await cq.message.edit_text(
-            text + delete_note(),
-            reply_markup=results_keyboard(view, s["group"], sid, page, pages, owner_id=s["user_id"]),
-            disable_web_page_preview=True,
-        )
-    except MessageNotModified:
-        pass
+    await richmsg.edit(cq.message, text + delete_note(), result_rows(view, s["group"], sid, page, pages, owner_id=s["user_id"]))
     await cq.answer()
 
 

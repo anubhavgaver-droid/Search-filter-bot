@@ -10,6 +10,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 import backup
 import database as db
 import texts
+from compat import NOPREVIEW
 from config import Config
 from delivery import reply_temp
 
@@ -90,7 +91,7 @@ async def _run_broadcast(client, src, text, users, status):
                 if src:
                     await src.copy(uid)
                 else:
-                    await client.send_message(uid, text, disable_web_page_preview=True)
+                    await client.send_message(uid, text, **NOPREVIEW)
                 sent += 1
             except FloodWait as e:
                 await asyncio.sleep(e.value + 1)

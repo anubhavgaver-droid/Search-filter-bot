@@ -9,7 +9,7 @@ import guards
 import search_engine as engine
 import texts
 from config import Config
-from delivery import reply_temp, results_keyboard
+from delivery import reply_temp, result_rows
 from notifier import admin_targets, notify_request_result
 
 
@@ -34,7 +34,7 @@ async def request_cmd(client, message):
     mode, hits = await engine.search(name)
     if mode == "exact":
         return await reply_temp(
-            message, texts.request_exists(user, name, hits), results_keyboard(hits, group, owner_id=message.from_user.id)
+            message, texts.request_exists(user, name, hits), result_rows(hits, group, owner_id=message.from_user.id)
         )
 
     if await db.count_requests(message.from_user.id, time.time() - 86400) >= Config.REQUEST_LIMIT:
