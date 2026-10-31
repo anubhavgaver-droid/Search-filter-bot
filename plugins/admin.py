@@ -1,13 +1,14 @@
 import html
 
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 import database as db
 import search_engine as engine
 from compat import NOPREVIEW
 from config import Config
+import richmsg
 from notifier import fulfil_requests
+from richmsg import Btn
 from utils import diagnose, get_text, manual_id, parse_link, parse_post, post_link
 
 admin = filters.user(Config.ADMINS) & filters.private
@@ -59,8 +60,8 @@ async def delete(client, message):
     res = await engine.fuzzy(arg, 5, 50)
     if not res:
         return await message.reply_text("❌ No matching post.")
-    rows = [[InlineKeyboardButton(f"🗑 {p['title'][:45]}", callback_data=f"d:{p['_id']}")] for p, _ in res]
-    await message.reply_text("Which one to delete?", reply_markup=InlineKeyboardMarkup(rows))
+    rows = [[Btn(f"🗑 {p['title'][:45]}", cb=f"d:{p['_id']}", style="danger")] for p, _ in res]
+    await richmsg.send(client, message.chat.id, "Which one to delete?", rows)
 
 
 @Client.on_callback_query(filters.regex(r"^d:"))
@@ -69,7 +70,7 @@ async def delete_cb(client, cq):
         return await cq.answer("Admins only.", show_alert=True)
     ok = await db.delete_post(cq.data[2:])
     await cq.answer("🗑 Deleted" if ok else "Already deleted", show_alert=False)
-    await cq.message.edit_text("🗑 Post deleted." if ok else "Already deleted.")
+    await richmsg.edit(cq.message, "🗑 Post deleted." if ok else "Already deleted.", [])
 
 
 @Client.on_message(filters.command("parse") & admin)

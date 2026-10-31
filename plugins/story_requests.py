@@ -2,7 +2,6 @@ import html
 import time
 
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 import database as db
 import guards
@@ -10,7 +9,9 @@ import search_engine as engine
 import texts
 from config import Config
 from delivery import reply_temp, result_rows
+import richmsg
 from notifier import admin_targets, notify_request_result
+from richmsg import Btn
 
 
 @Client.on_message(filters.command("request"))
@@ -43,13 +44,11 @@ async def request_cmd(client, message):
     where = "Private chat" if not group else (message.chat.title or "Group")
     rid = await db.add_request(message.from_user.id, message.from_user.first_name or "User", name, where, message.chat.id)
 
-    kb = InlineKeyboardMarkup(
-        [[InlineKeyboardButton("✅ Added", callback_data=f"rq:ok:{rid}"),
-          InlineKeyboardButton("❌ Reject", callback_data=f"rq:no:{rid}")]]
-    )
+    kb = [[Btn("✅ Added", cb=f"rq:ok:{rid}", style="success"),
+           Btn("❌ Reject", cb=f"rq:no:{rid}", style="danger")]]
     for t in admin_targets():
         try:
-            await client.send_message(t, texts.request_admin(name, user, message.from_user.id, where), reply_markup=kb)
+            await richmsg.send(client, t, texts.request_admin(name, user, message.from_user.id, where), kb)
         except Exception:
             pass  # admin hasn't started the bot / no access
 
@@ -72,10 +71,10 @@ async def request_decision(client, cq):
     notified = await notify_request_result(client, r, ok)
 
     label = ("✅ <b>Marked as added</b>" if ok else "❌ <b>Rejected</b>") + f" by {texts.mention(cq.from_user)}\n{notified}"
-    try:
-        await cq.message.edit_text(f"{cq.message.text.html}\n\n{label}", reply_markup=None)
-    except Exception:
-        pass
+    base = richmsg.text_of(cq.message) or texts.request_admin(
+        r["query"], texts.mention_id(r["user_id"], r.get("user_name", "User")), r["user_id"], r.get("where", "?")
+    )
+    await richmsg.edit(cq.message, f"{base}\n\n{label}", [])
     await cq.answer("Done")
 
 

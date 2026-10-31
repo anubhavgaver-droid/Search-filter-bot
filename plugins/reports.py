@@ -1,14 +1,16 @@
 import re
 
 from pyrogram import Client, filters
-from pyrogram.types import ForceReply, InlineKeyboardButton, InlineKeyboardMarkup
+from pyrogram.types import ForceReply
 
 import database as db
 import texts
 from compat import NOPREVIEW
 from config import Config
 from delivery import deliver
+import richmsg
 from notifier import admin_targets
+from richmsg import Btn
 from utils import parse_post, post_link
 
 
@@ -21,25 +23,21 @@ async def report(client, cq):
     if not await db.add_report(pid, cq.from_user.id):
         return await cq.answer("You already reported this one. Thank you! 🙏", show_alert=True)
 
-    kb = InlineKeyboardMarkup(
-        [[InlineKeyboardButton("🗑 Delete story", callback_data=f"rpd:{pid}"),
-          InlineKeyboardButton("✅ Ignore", callback_data=f"rpi:{pid}")],
-         [InlineKeyboardButton("🔗 Add new link", callback_data=f"rpl:{pid}")]]
-    )
+    kb = [[Btn("🗑 Delete story", cb=f"rpd:{pid}", style="danger"),
+           Btn("✅ Ignore", cb=f"rpi:{pid}", style="success")],
+          [Btn("🔗 Add new link", cb=f"rpl:{pid}", style="primary")]]
     text = texts.report_admin(p["title"], post_link(p), texts.mention(cq.from_user))
     for t in admin_targets():
         try:
-            await client.send_message(t, text, reply_markup=kb, **NOPREVIEW)
+            await richmsg.send(client, t, text, kb)
         except Exception:
             pass
     await cq.answer("Thanks! The admin has been notified. 🙏", show_alert=True)
 
 
 async def _finish(cq, label: str):
-    try:
-        await cq.message.edit_text(f"{cq.message.text.html}\n\n{label} by {texts.mention(cq.from_user)}", reply_markup=None, **NOPREVIEW)
-    except Exception:
-        pass
+    base = richmsg.text_of(cq.message) or "⚠️ <b>BROKEN LINK REPORT</b>"
+    await richmsg.edit(cq.message, f"{base}\n\n{label} by {texts.mention(cq.from_user)}", [])
 
 
 @Client.on_callback_query(filters.regex(r"^rpd:"))
@@ -120,21 +118,23 @@ async def apply_new_link(client, message):
     fields = {k: data[k] for k in ("is_private", "target_chat_id", "target_username", "target_msg_id", "invite_url")}
     await db.update_post_fields(p["_id"], fields)
     new_link = post_link({**p, **fields})
-    await message.reply_text(
+    await richmsg.send(
+        client, message.chat.id,
         texts.link_changed(p["title"], new_link, fields["is_private"]),
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📂 Test the new link", url=new_link)]]),
-        **NOPREVIEW,
+        [[Btn("📂 Test the new link", url=new_link, style="primary")]],
+        reply_to=None if message.chat.type.name == "PRIVATE" else message.id,
     )
 
     ref = re.search(r"Ref:\s*(-?\d+):(\d+)", rep.text)  # mark the original report as handled
     if ref:
         try:
             chat_id, mid = int(ref.group(1)), int(ref.group(2))
-            orig = await client.get_messages(chat_id, mid)
-            await client.edit_message_text(
-                chat_id, mid,
-                f"{orig.text.html}\n\n🔗 <b>Link changed</b> by {texts.mention(message.from_user)}",
-                reply_markup=None, **NOPREVIEW,
+            base = richmsg.cached(chat_id, mid)
+            if base is None:
+                base = richmsg.text_of(await client.get_messages(chat_id, mid)) or "⚠️ <b>BROKEN LINK REPORT</b>"
+            await richmsg.edit_id(
+                client, chat_id, mid,
+                f"{base}\n\n🔗 <b>Link changed</b> by {texts.mention(message.from_user)}", [],
             )
         except Exception:
             pass

@@ -5,14 +5,15 @@ import time
 
 from pyrogram import Client, filters
 from pyrogram.errors import FloodWait, InputUserDeactivated, PeerIdInvalid, UserIsBlocked
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 import backup
 import database as db
 import texts
 from compat import NOPREVIEW
 from config import Config
+import richmsg
 from delivery import reply_temp
+from richmsg import Btn
 
 admin = filters.user(Config.ADMINS) & filters.private
 admin_any = filters.user(Config.ADMINS)
@@ -186,9 +187,7 @@ async def _say(message, text):
 
 
 def _groups_keyboard(rows):
-    return InlineKeyboardMarkup(
-        [[InlineKeyboardButton(f"🗑 {g.get('title', '?')[:35]}", callback_data=f"gd:{g['_id']}")] for g in rows[:20]]
-    ) if rows else None
+    return [[Btn(f"🗑 {g.get('title', '?')[:35]}", cb=f"gd:{g['_id']}", style="danger")] for g in rows[:20]] if rows else []
 
 
 @Client.on_message(filters.command("allowgroup") & admin_any)
@@ -213,7 +212,7 @@ async def deny_group(client, message):
 @Client.on_message(filters.command("groups") & admin)
 async def groups(client, message):
     rows = await db.list_groups()
-    await message.reply_text(texts.groups_list(rows), reply_markup=_groups_keyboard(rows))
+    await richmsg.send(client, message.chat.id, texts.groups_list(rows), _groups_keyboard(rows))
 
 
 @Client.on_callback_query(filters.regex(r"^gd:"))
@@ -222,10 +221,7 @@ async def group_remove(client, cq):
         return await cq.answer("Admins only.", show_alert=True)
     await db.deny_group(int(cq.data[3:]))
     rows = await db.list_groups()
-    try:
-        await cq.message.edit_text(texts.groups_list(rows), reply_markup=_groups_keyboard(rows))
-    except Exception:
-        pass
+    await richmsg.edit(cq.message, texts.groups_list(rows), _groups_keyboard(rows))
     await cq.answer("Removed")
 
 

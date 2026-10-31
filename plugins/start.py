@@ -3,7 +3,8 @@ from pyrogram import Client, filters
 import database as db
 from config import Config
 import texts
-from delivery import deliver, miniapp_button, send_temp
+import richmsg
+from delivery import deliver, miniapp_btn, send_temp
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from richmsg import Btn
 from utils import parse_start_payload
@@ -44,12 +45,15 @@ async def start(client, message):
             return await deliver(client, message.from_user.id, pid)
 
     if len(message.command) > 1 and message.command[1] == "app":  # from the group's Mini App button
-        btn = miniapp_button(True)
+        btn = miniapp_btn(True)
         if btn:
-            return await send_temp(client, message.from_user.id, texts.miniapp_card(), InlineKeyboardMarkup([[btn]]))
+            return await send_temp(client, message.from_user.id, texts.miniapp_card(), [[btn]])
 
     text = texts.welcome()
     if message.from_user.id in Config.ADMINS:
         text += ADMIN_HELP
-    btn = miniapp_button(True)
-    await message.reply_text(text, reply_markup=InlineKeyboardMarkup([[btn]]) if btn else None)
+    btn = miniapp_btn(True)
+    if btn:
+        await richmsg.send(client, message.chat.id, text, [[btn]])
+    else:
+        await message.reply_text(text)
