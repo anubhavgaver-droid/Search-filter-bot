@@ -1,10 +1,10 @@
-# Rich buttons update (v2)
+# Rich buttons update (v3 - every button)
 
 Copy into your bot repo, same folders, replace when asked.
 
-NEW      compat.py                   -> root   (fixes Kurigram argument names)
-NEW      richmsg.py                  -> root   (rich message + automatic fallback)
-REPLACE  bot.py                      -> root   (fix: unexpected keyword argument use_qr)
+NEW      compat.py                   -> root   (Kurigram argument names)
+NEW      richmsg.py                  -> root   (rich messages + automatic fallback)
+REPLACE  bot.py                      -> root   (fix: use_qr error)
 REPLACE  delivery.py                 -> root
 REPLACE  notifier.py                 -> root
 REPLACE  config.py                   -> root
@@ -18,14 +18,16 @@ REPLACE  plugins/admin.py
 REPLACE  plugins/admin_tools.py
 REPLACE  plugins/reports.py
 
-Fixed: TypeError "Message.reply() got an unexpected keyword argument 'disable_web_page_preview'"
-(Kurigram renamed it; all files now use compat.NOPREVIEW).
+Every button is now a rich message button (inside the bubble, colored):
+- Users: search results, Back/Page/Next, Open post, Report broken link, Join / I've joined,
+  /filters + genres, /request result, Get story notice, Mini App (PM and group), Search your own story
+- Admin: report panel (Delete / Ignore / Add new link), request panel (Added / Reject),
+  /groups remove buttons, /delete picker, "Test the new link"
 
-Rich message (buttons inside the bubble): search results (group + PM), Back/Page/Next,
-Open post, Report broken link, Join channel / I've joined, /filters + genres, /request
-"already available", "Get story" notice, Mini App button in groups, "Search your own story".
+Mini App button in PM uses Telegram's native blocks form (web_app buttons need it).
+When an admin button is pressed the message is edited ("Added by ..."); the original text is
+remembered in memory, and rebuilt from the database if the bot restarted in between.
 
-Still normal inline buttons (on purpose): Mini App button in PM (needs the real web_app button),
-and admin panels (report Delete/Ignore/Add link, request Added/Reject, /groups, /delete).
-
-Env RICH_BUTTONS=0 switches the rich look off.
+Safety:
+- If Telegram refuses a rich message, the bot sends the old normal buttons instead (see logs: "richmsg").
+- Env RICH_BUTTONS=0 turns the rich look off without touching code.

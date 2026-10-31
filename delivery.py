@@ -96,6 +96,15 @@ def miniapp_button(private: bool):
     return InlineKeyboardButton("🚀 Open Mini App", url=Config.MINIAPP_LINK or f"https://t.me/{Config.BOT_USERNAME}?start=app")
 
 
+def miniapp_btn(private: bool):
+    """Open-Mini-App button as a Btn. In PM it opens the app directly; in groups it is a link."""
+    if not Config.WEBAPP_URL:
+        return None
+    if private:
+        return Btn("🚀 Open Mini App", web_app=Config.WEBAPP_URL, style="success")
+    return Btn("🚀 Open Mini App", url=Config.MINIAPP_LINK or f"https://t.me/{Config.BOT_USERNAME}?start=app", style="success")
+
+
 async def is_member(client, chat_id: int, user_id: int) -> bool:
     """Membership check that fails OPEN (a broken setup must not lock everybody out)."""
     try:
