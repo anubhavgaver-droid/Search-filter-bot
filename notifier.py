@@ -1,12 +1,13 @@
 import html
 
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 import database as db
 import search_engine as engine
 import texts
 from config import Config
+import richmsg
 from delivery import deep_link
+from richmsg import Btn
 
 
 def admin_targets() -> list:
@@ -17,24 +18,25 @@ async def notify_request_result(client, r: dict, ok: bool, post=None) -> str:
     """Tell the requester (tagged in the group they asked from, else in PM). Returns a status line for admins."""
     chat_id = r.get("chat_id")
     in_group = bool(chat_id) and chat_id != r["user_id"]  # a private chat has the same id as the user
-    kb = None
+    rows = []
     if ok and post:
-        kb = InlineKeyboardMarkup([[InlineKeyboardButton("📖 Get story", url=deep_link(post["_id"], r["user_id"]))]])
+        rows = [[Btn("📖 Get story", url=deep_link(post["_id"], r["user_id"]), style="success")]]
 
     if in_group:
         try:
-            sent = await client.send_message(
+            mid = await richmsg.send(
+                client,
                 chat_id,
                 texts.request_done(r["query"], ok, texts.mention_id(r["user_id"], r.get("user_name", "User"))),
-                reply_markup=kb,
+                rows,
             )
             if Config.REQUEST_NOTICE_DELETE:
-                await db.schedule_delete(chat_id, sent.id, Config.REQUEST_NOTICE_DELETE)
+                await db.schedule_delete(chat_id, mid, Config.REQUEST_NOTICE_DELETE)
             return f"📣 tagged in <b>{html.escape(r.get('where', 'the group'))}</b>"
         except Exception:
             pass
     try:  # asked in PM (or the group message failed) -> PM, kept (not auto-deleted)
-        await client.send_message(r["user_id"], texts.request_done(r["query"], ok), reply_markup=kb)
+        await richmsg.send(client, r["user_id"], texts.request_done(r["query"], ok), rows)
         return "📩 notified in PM"
     except Exception:
         return "⚠️ <i>couldn't notify (hasn't started the bot)</i>"

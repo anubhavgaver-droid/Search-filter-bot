@@ -54,3 +54,6 @@ class Config:
     BACKUP_CHAT_ID = int(os.getenv("BACKUP_CHAT_ID") or 0)        # blank = first admin
     BACKUP_EVERY_HOURS = int(os.getenv("BACKUP_EVERY_HOURS", 24))  # 0 = off
     BROADCAST_DELAY = float(os.getenv("BROADCAST_DELAY", 0.06))   # seconds between messages (~16/s)
+
+    # ---- rich messages: buttons inside the message bubble (set RICH_BUTTONS=0 to go back to normal buttons) ----
+    RICH_BUTTONS = os.getenv("RICH_BUTTONS", "1") != "0"

@@ -1,13 +1,16 @@
 import logging
 from datetime import datetime, timedelta
 
-from pyrogram.enums import ChatMemberStatus
+from pyrogram.enums import ChatMemberStatus, ChatType
 from pyrogram.errors import UserNotParticipant
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 
 import database as db
 import texts
+from compat import NOPREVIEW
 from config import Config
+import richmsg
+from richmsg import Btn
 from utils import make_start_payload, post_link
 
 _fs_link = {"url": ""}
@@ -26,38 +29,59 @@ def deep_link(pid: str, owner_id=None) -> str:
 def nav_row(prefix: str, sid: str, page: int, pages: int) -> list:
     row = []
     if page > 0:
-        row.append(InlineKeyboardButton("⬅️ Back", callback_data=f"{prefix}:{sid}:{page - 1}"))
-    row.append(InlineKeyboardButton(f"📄 {page + 1}/{pages}", callback_data="noop"))
+        row.append(Btn("⬅️ Back", cb=f"{prefix}:{sid}:{page - 1}", style="primary"))
+    row.append(Btn(f"📄 {page + 1}/{pages}", cb="noop", style="primary"))
     if page < pages - 1:
-        row.append(InlineKeyboardButton("Next ➡️", callback_data=f"{prefix}:{sid}:{page + 1}"))
+        row.append(Btn("Next ➡️", cb=f"{prefix}:{sid}:{page + 1}", style="primary"))
     return row
 
 
-def results_keyboard(hits: list, group: bool, sid=None, page: int = 0, pages: int = 1, owner_id=None) -> InlineKeyboardMarkup:
+def result_rows(hits: list, group: bool, sid=None, page: int = 0, pages: int = 1, owner_id=None) -> list:
+    """Search-result buttons as Btn rows (shown inside the message bubble)."""
     rows = []
     for p in hits:
         label = f"{'🔒' if p['is_private'] else '📖'} {p['title'][:42]}"
         if group:  # groups: always go through the bot's PM (deep link)
-            rows.append([InlineKeyboardButton(label, url=deep_link(p["_id"], owner_id))])
+            rows.append([Btn(label, url=deep_link(p["_id"], owner_id), style="primary")])
         elif p["is_private"] or Config.FORCE_SUB_CHANNEL:  # force-sub / join checks need the bot in between
-            rows.append([InlineKeyboardButton(label, callback_data=f"o:{p['_id']}")])
+            rows.append([Btn(label, cb=f"o:{p['_id']}", style="primary")])
         else:
-            rows.append([InlineKeyboardButton(label, url=post_link(p))])
+            rows.append([Btn(label, url=post_link(p), style="primary")])
     if sid and pages > 1:
         rows.append(nav_row("pg", sid, page, pages))
-    return InlineKeyboardMarkup(rows)
+    return rows
+
+
+def results_keyboard(hits: list, group: bool, sid=None, page: int = 0, pages: int = 1, owner_id=None):
+    """Old-style inline keyboard (kept so nothing else breaks)."""
+    return richmsg.markup(result_rows(hits, group, sid, page, pages, owner_id))
+
+
+def _is_rows(kb) -> bool:
+    """kb as a list of Btn rows -> rich message. None / InlineKeyboardMarkup -> old behaviour."""
+    return isinstance(kb, list) and len(kb) > 0
 
 
 async def reply_temp(message, text, kb=None):
     """Reply and schedule the reply for auto-delete."""
-    sent = await message.reply_text(text + delete_note(), reply_markup=kb, disable_web_page_preview=True)
+    if _is_rows(kb):
+        quote = message.chat.type != ChatType.PRIVATE  # same as Pyrogram's default reply behaviour
+        mid = await richmsg.send(message._client, message.chat.id, text + delete_note(), kb,
+                                 reply_to=message.id if quote else None)
+        await db.schedule_delete(message.chat.id, mid, Config.AUTO_DELETE)
+        return mid
+    sent = await message.reply_text(text + delete_note(), reply_markup=kb or None, **NOPREVIEW)
     await db.schedule_delete(sent.chat.id, sent.id, Config.AUTO_DELETE)
     return sent
 
 
 async def send_temp(client, chat_id, text, kb=None):
+    if _is_rows(kb):
+        mid = await richmsg.send(client, chat_id, text + delete_note(), kb)
+        await db.schedule_delete(chat_id, mid, Config.AUTO_DELETE)
+        return mid
     sent = await client.send_message(
-        chat_id, text + delete_note(), reply_markup=kb, disable_web_page_preview=True
+        chat_id, text + delete_note(), reply_markup=kb or None, **NOPREVIEW
     )
     await db.schedule_delete(chat_id, sent.id, Config.AUTO_DELETE)
     return sent
@@ -98,20 +122,16 @@ async def _force_sub_blocked(client, user_id: int, pid: str) -> bool:
             return False
     await send_temp(
         client, user_id, texts.force_sub(),
-        InlineKeyboardMarkup(
-            [[InlineKeyboardButton("➕ Join channel", url=url)],
-             [InlineKeyboardButton("✅ I've joined", callback_data=f"fs:{pid}")]]
-        ),
+        [[Btn("➕ Join channel", url=url, style="primary")],
+         [Btn("✅ I've joined", cb=f"fs:{pid}", style="success")]],
     )
     return True
 
 
 async def _send_link(client, user_id: int, p: dict):
     await db.log_view(p["_id"], user_id)  # feeds "Trending" and the stats
-    kb = InlineKeyboardMarkup(
-        [[InlineKeyboardButton("📂 Open post", url=post_link(p))],
-         [InlineKeyboardButton("⚠️ Report broken link", callback_data=f"rp:{p['_id']}")]]
-    )
+    kb = [[Btn("📂 Open post", url=post_link(p), style="primary")],
+          [Btn("⚠️ Report broken link", cb=f"rp:{p['_id']}", style="danger")]]
     return await send_temp(client, user_id, texts.link_ready(p["title"]), kb)
 
 
@@ -153,10 +173,8 @@ async def deliver(client, user_id: int, pid: str):
         client,
         user_id,
         texts.join_required(p["title"]),
-        InlineKeyboardMarkup(
-            [
-                [InlineKeyboardButton("➕ Join channel", url=invite.invite_link)],
-                [InlineKeyboardButton("✅ I've joined", callback_data=f"j:{pid}")],
-            ]
-        ),
+        [
+            [Btn("➕ Join channel", url=invite.invite_link, style="primary")],
+            [Btn("✅ I've joined", cb=f"j:{pid}", style="success")],
+        ],
     )

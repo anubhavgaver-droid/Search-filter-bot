@@ -93,7 +93,7 @@ class Bot(Client):
         self._runner = None
         self._tasks = []
 
-    async def start(self):
+    async def start(self, *args, **kwargs):
         # web server first, so Render sees the open port quickly
         app = web.Application()
         app.router.add_get("/", _health)
@@ -104,7 +104,7 @@ class Bot(Client):
         await web.TCPSite(self._runner, "0.0.0.0", Config.PORT).start()
         logging.info("Web server on port %s", Config.PORT)
 
-        await super().start()
+        await super().start(*args, **kwargs)
         await db.setup()
         me = await self.get_me()
         Config.BOT_USERNAME = me.username
@@ -141,12 +141,12 @@ class Bot(Client):
         if url:
             self._tasks.append(asyncio.create_task(_keep_alive(url)))
 
-    async def stop(self, *args):
+    async def stop(self, *args, **kwargs):
         for t in self._tasks:
             t.cancel()
         if self._runner:
             await self._runner.cleanup()
-        await super().stop()
+        await super().stop(*args, **kwargs)
         logging.info("Bot stopped")
 
 
